@@ -1,6 +1,7 @@
 .PHONY: help deploy teardown status rabbitmq-ui prometheus-ui logs-rabbitmq logs-prometheus logs-keda clean \
         build-apps deploy-apps start-producing stop-producing start-consuming stop-consuming demo-status \
-        logs-producer logs-consumer
+        logs-producer logs-consumer install-prometheus-adapter enable-hpa disable-hpa enable-keda \
+        disable-keda scaling-status watch-scaling
 
 # Default target
 help:
@@ -21,6 +22,15 @@ help:
 	@echo "  make start-consuming - Start message consumption"
 	@echo "  make stop-consuming  - Stop message consumption"
 	@echo "  make demo-status     - Show demo status (queue depth, pods, etc.)"
+	@echo ""
+	@echo "Layer 3 - Autoscaling:"
+	@echo "  make install-prometheus-adapter - Install Prometheus Adapter"
+	@echo "  make enable-hpa      - Enable HPA + Prometheus Adapter scaling"
+	@echo "  make disable-hpa     - Disable HPA scaling"
+	@echo "  make enable-keda     - Enable KEDA autoscaling"
+	@echo "  make disable-keda    - Disable KEDA autoscaling"
+	@echo "  make scaling-status  - Show active autoscaling method and status"
+	@echo "  make watch-scaling   - Watch autoscaling in real-time"
 	@echo ""
 	@echo "Access Services:"
 	@echo "  make rabbitmq-ui    - Port-forward to RabbitMQ Management UI"
@@ -141,6 +151,59 @@ logs-producer:
 logs-consumer:
 	@echo "Tailing consumer logs (Ctrl+C to exit)..."
 	@kubectl logs -f -n keda-demo -l app=consumer --tail=50
+
+# Install Prometheus Adapter
+install-prometheus-adapter:
+	@./scripts/install-prometheus-adapter.sh
+
+# Enable HPA + Prometheus Adapter scaling
+enable-hpa:
+	@./scripts/enable-hpa.sh
+
+# Disable HPA scaling
+disable-hpa:
+	@./scripts/disable-hpa.sh
+
+# Enable KEDA autoscaling
+enable-keda:
+	@./scripts/enable-keda-scaling.sh
+
+# Disable KEDA autoscaling
+disable-keda:
+	@./scripts/disable-keda-scaling.sh
+
+# Show autoscaling status
+scaling-status:
+	@./scripts/scaling-status.sh
+
+# Watch autoscaling in real-time
+watch-scaling:
+	@echo "Watching autoscaling (Ctrl+C to exit)..."
+	@while true; do \
+		clear; \
+		echo "=== Consumer Pods ==="; \
+		kubectl get pods -n keda-demo -l app=consumer 2>/dev/null || echo "No pods found"; \
+		echo ""; \
+		echo "=== Autoscaling Status ==="; \
+		if kubectl get hpa consumer-hpa -n keda-demo 2>/dev/null; then \
+			echo ""; \
+		elif kubectl get scaledobject consumer-scaledobject -n keda-demo 2>/dev/null; then \
+			echo ""; \
+		else \
+			echo "No autoscaling active"; \
+		fi; \
+		echo ""; \
+		echo "=== Queue Status ==="; \
+		POD=$$(kubectl get pods -n keda-demo -l app=rabbitmq -o jsonpath='{.items[0].metadata.name}' 2>/dev/null); \
+		if [ -n "$$POD" ]; then \
+			kubectl exec -n keda-demo "$$POD" -- rabbitmqadmin list queues name messages consumers -f tsv 2>/dev/null || echo "Could not fetch queue stats"; \
+		else \
+			echo "RabbitMQ pod not found"; \
+		fi; \
+		echo ""; \
+		echo "Last updated: $$(date)"; \
+		sleep 2; \
+	done
 
 # Clean up local artifacts
 clean:

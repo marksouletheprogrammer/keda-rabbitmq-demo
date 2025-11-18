@@ -63,10 +63,16 @@ keda-rabbitmq-demo/
 │   │   ├── prometheus-service.yaml
 │   │   ├── prometheus-configmap.yaml
 │   │   └── prometheus-rbac.yaml
-│   └── apps/                     # Application deployments
-│       ├── app-configmap.yaml
-│       ├── producer-deployment.yaml
-│       └── consumer-deployment.yaml
+│   ├── apps/                     # Application deployments
+│   │   ├── app-configmap.yaml
+│   │   ├── producer-deployment.yaml
+│   │   └── consumer-deployment.yaml
+│   └── autoscaling/              # Autoscaling configurations
+│       ├── prometheus-adapter/
+│       │   └── hpa-prometheus.yaml
+│       └── keda/
+│           ├── trigger-auth.yaml
+│           └── scaled-object.yaml
 ├── scripts/                      # Management scripts
 │   ├── deploy.sh                 # Deploy infrastructure
 │   ├── teardown.sh               # Remove infrastructure
@@ -77,7 +83,13 @@ keda-rabbitmq-demo/
 │   ├── stop-producing.sh         # Stop producer
 │   ├── start-consuming.sh        # Start consumer
 │   ├── stop-consuming.sh         # Stop consumer
-│   └── demo-status.sh            # Show demo status
+│   ├── demo-status.sh            # Show demo status
+│   ├── install-prometheus-adapter.sh  # Install Prometheus Adapter
+│   ├── enable-hpa.sh             # Enable HPA autoscaling
+│   ├── disable-hpa.sh            # Disable HPA autoscaling
+│   ├── enable-keda-scaling.sh    # Enable KEDA autoscaling
+│   ├── disable-keda-scaling.sh   # Disable KEDA autoscaling
+│   └── scaling-status.sh         # Show autoscaling status
 ├── Dockerfile.producer           # Producer container image
 ├── Dockerfile.consumer           # Consumer container image
 ├── go.mod                        # Go module definition
@@ -294,15 +306,168 @@ make logs-producer   # In one terminal
 make logs-consumer   # In another terminal
 ```
 
-## Layer 3: Autoscaling Configurations 🚧
+## Layer 3: Autoscaling Configurations ✅
 
-**Status:** Pending
+**Status:** Complete
 
-Layer 3 will include:
-- KEDA ScaledObject for RabbitMQ-based autoscaling
-- Prometheus Adapter configuration for metrics-based autoscaling
-- Scripts to switch between KEDA and Prometheus Adapter
-- Comparison metrics and dashboards
+Layer 3 provides two mutually exclusive autoscaling approaches for comparing traditional Kubernetes HPA with KEDA:
+
+### Autoscaling Options
+
+#### Option 1: HPA + Prometheus Adapter
+
+Traditional Kubernetes approach using custom metrics from Prometheus:
+
+- **Prometheus** scrapes RabbitMQ queue metrics
+- **Prometheus Adapter** exposes metrics as Kubernetes custom metrics API
+- **HPA** scales consumer deployment based on queue depth
+- **Min replicas**: 1 (cannot scale to zero)
+- **Target**: 5 messages per pod
+
+**Pros:**
+- Standard Kubernetes approach
+- Works with any Prometheus metric
+- Fine-grained control over HPA behavior
+
+**Cons:**
+- More complex setup (Adapter + HPA)
+- Cannot scale to zero
+- Metric lag through Prometheus scraping
+
+#### Option 2: KEDA Prometheus Scaler
+
+Event-driven autoscaling using Prometheus metrics:
+
+- **KEDA** queries Prometheus for RabbitMQ queue metrics
+- **ScaledObject** automatically manages HPA creation
+- **Prometheus plugin** exposes RabbitMQ queue depth metrics
+- **Min replicas**: 0 (can scale to zero!)
+- **Target**: 5 messages per pod
+
+**Pros:**
+- Simpler configuration (single ScaledObject)
+- Uses same metrics as HPA approach (fair comparison)
+- Can scale to zero when queue is empty
+- Avoids deprecated RabbitMQ management API
+- Event-driven architecture
+
+**Cons:**
+- Requires KEDA installation
+- Requires Prometheus infrastructure
+
+### Configuration Details
+
+Both methods use the same threshold for fair comparison:
+- **Queue depth target**: 5 messages per pod
+- **Max replicas**: 10
+- **Scaling calculation**: `desired_replicas = queue_depth / 5`
+
+Example: If queue has 50 messages → 50 / 5 = 10 pods
+
+### Available Commands
+
+```bash
+# Prometheus Adapter (if not already installed)
+make install-prometheus-adapter
+
+# Enable HPA + Prometheus Adapter scaling
+make enable-hpa
+
+# Disable HPA scaling
+make disable-hpa
+
+# Enable KEDA autoscaling
+make enable-keda
+
+# Disable KEDA autoscaling
+make disable-keda
+
+# Check which method is active
+make scaling-status
+
+# Watch scaling in real-time
+make watch-scaling
+```
+
+### Comparison Table
+
+| Feature | HPA + Prometheus Adapter | KEDA |
+|---------|-------------------------|------|
+| **Setup Complexity** | High (Adapter + HPA) | Low (ScaledObject only) |
+| **Min Replicas** | 1 | 0 (scale to zero!) |
+| **Metric Source** | Prometheus (via Adapter) | Prometheus (via KEDA) |
+| **Latency** | Similar (both query Prometheus) | Similar (both query Prometheus) |
+| **Flexibility** | Any Prometheus metric | Event source specific |
+| **Standard K8s** | Yes | Requires KEDA |
+| **Configuration** | Multiple resources | Single ScaledObject |
+| **Scale to Zero** | No | Yes |
+
+### Quick Start (Layer 3)
+
+After completing Layers 1 and 2:
+
+#### Testing HPA + Prometheus Adapter
+
+```bash
+# 1. Enable HPA-based autoscaling
+make enable-hpa
+
+# 2. Start producing messages
+make start-producing
+
+# 3. Watch HPA scale up consumer pods
+make scaling-status
+# or
+make watch-scaling
+
+# 4. View in RabbitMQ UI
+make rabbitmq-ui
+
+# 5. Stop producing and watch scale down
+make stop-producing
+
+# 6. Disable HPA when done
+make disable-hpa
+```
+
+#### Testing KEDA Autoscaling
+
+```bash
+# 1. Enable KEDA autoscaling (starts at 0 replicas)
+make enable-keda
+
+# 2. Start producing messages
+make start-producing
+
+# 3. Watch KEDA scale up from 0
+make scaling-status
+# or
+kubectl get scaledobject -n keda-demo --watch
+
+# 4. View in RabbitMQ UI
+make rabbitmq-ui
+
+# 5. Stop producing and watch scale back to 0
+make stop-producing
+
+# 6. Disable KEDA when done
+make disable-keda
+```
+
+### Mutual Exclusion
+
+Only one autoscaling method can be active at a time. The scripts enforce this:
+
+```bash
+# This will fail if HPA is active
+make enable-keda
+# Error: HPA autoscaling is currently active.
+# Please disable HPA first: make disable-hpa
+
+# Switch between methods
+make disable-hpa
+make enable-keda
+```
 
 ## Demo Scenarios
 
@@ -333,29 +498,173 @@ make start-consuming
 make logs-consumer
 ```
 
-### Scenario 4: KEDA Autoscaling (Layer 3)
+### Scenario 4: HPA Autoscaling (Layer 3)
 ```bash
-# Enable KEDA-based autoscaling
-# Commands will be available in Layer 3
-```
+# Enable HPA + Prometheus Adapter autoscaling
+make enable-hpa
 
-### Scenario 5: Prometheus Adapter Autoscaling (Layer 3)
-```bash
-# Switch to Prometheus Adapter-based autoscaling
-# Commands will be available in Layer 3
-```
+# Producer should already be running from Scenario 2
+# If not, start it:
+make start-producing
 
-### Scenario 6: Teardown
-```bash
-# Stop producing and consuming
+# Watch HPA scale consumer pods based on queue depth
+make watch-scaling
+# or
+make scaling-status
+
+# View queue and metrics in RabbitMQ UI
+make rabbitmq-ui
+
+# Stop producing to see scale down
 make stop-producing
-make stop-consuming
+```
 
-# Clean up all infrastructure
+### Scenario 5: KEDA Autoscaling (Layer 3)
+```bash
+# Switch to KEDA autoscaling
+make disable-hpa
+make enable-keda
+
+# Start producing messages
+make start-producing
+
+# Watch KEDA scale from 0 to multiple pods
+make scaling-status
+kubectl get scaledobject -n keda-demo --watch
+
+# View queue in RabbitMQ UI
+make rabbitmq-ui
+
+# Stop producing and watch KEDA scale back to 0
+make stop-producing
+```
+
+### Scenario 6: Comparison & Teardown
+```bash
+# Compare both autoscaling methods
+# 1. Test HPA
+make enable-hpa
+make start-producing
+# Observe scaling behavior, note: min replicas = 1
+
+make stop-producing
+make disable-hpa
+
+# 2. Test KEDA
+make enable-keda
+make start-producing
+# Observe scaling behavior, note: can scale to 0!
+
+make stop-producing
+# Watch KEDA scale to 0 after cooldown period
+
+# Final teardown
+make disable-keda
 make teardown
 ```
 
 ## Troubleshooting
+
+### Layer 3 Issues
+
+#### Prometheus Adapter Not Installing
+
+Check Helm repository:
+```bash
+helm repo list
+helm repo update
+```
+
+Verify Prometheus is running:
+```bash
+kubectl get svc prometheus -n keda-demo
+```
+
+#### HPA Shows "Unknown" Metrics
+
+Wait for Prometheus Adapter to collect metrics (may take 1-2 minutes):
+```bash
+# Check if custom metrics API is available
+kubectl get apiservice v1beta1.custom.metrics.k8s.io
+
+# Check Prometheus Adapter logs
+kubectl logs -n keda-demo -l app.kubernetes.io/name=prometheus-adapter
+
+# Verify metric is available
+kubectl get --raw "/apis/custom.metrics.k8s.io/v1beta1/namespaces/keda-demo/services/rabbitmq/rabbitmq_queue_messages_ready"
+```
+
+Ensure RabbitMQ is exposing metrics:
+```bash
+# Check if RabbitMQ Prometheus plugin is enabled
+kubectl exec -n keda-demo -l app=rabbitmq -- rabbitmq-plugins list | grep prometheus
+
+# Verify metrics endpoint
+kubectl exec -n keda-demo -l app=rabbitmq -- wget -qO- http://localhost:15692/metrics | head
+```
+
+#### KEDA ScaledObject Not Scaling
+
+Check ScaledObject status:
+```bash
+kubectl describe scaledobject consumer-scaledobject -n keda-demo
+```
+
+Verify KEDA operator is running:
+```bash
+kubectl get pods -n keda
+kubectl logs -n keda -l app=keda-operator
+```
+
+Verify Prometheus is accessible from KEDA:
+```bash
+# Check Prometheus service
+kubectl get svc prometheus -n keda-demo
+
+# Test Prometheus query
+kubectl run -it --rm debug --image=curlimages/curl --restart=Never -- \
+  curl -s "http://prometheus.keda-demo.svc.cluster.local:9090/api/v1/query?query=rabbitmq_queue_messages_ready"
+```
+
+Check if RabbitMQ metrics are in Prometheus:
+```bash
+# View Prometheus UI and search for: rabbitmq_queue_messages_ready{queue="demo-queue"}
+make prometheus-ui
+```
+
+#### Both Autoscaling Methods Active
+
+This shouldn't happen, but if it does:
+```bash
+# Disable both
+make disable-hpa
+make disable-keda
+
+# Verify nothing is active
+make scaling-status
+
+# Enable the one you want
+make enable-keda  # or make enable-hpa
+```
+
+#### Consumer Not Scaling as Expected
+
+Check queue has messages:
+```bash
+make demo-status
+make rabbitmq-ui
+```
+
+Ensure producer is running:
+```bash
+kubectl get pods -n keda-demo -l app=producer
+make logs-producer
+```
+
+Check consumer deployment is not manually scaled:
+```bash
+kubectl get deployment consumer -n keda-demo
+```
 
 ### Layer 2 Issues
 

@@ -1,0 +1,20 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: consumer-scaledobject
+  namespace: keda-demo
+spec:
+  scaleTargetRef:
+    name: consumer
+  minReplicaCount: 0
+  maxReplicaCount: 10
+  pollingInterval: 15
+  cooldownPeriod: 300
+  triggers:
+  - type: prometheus
+    metadata:
+      serverAddress: http://prometheus.keda-demo.svc.cluster.local:9090
+      metricName: rabbitmq_queue_messages_ready
+      query: sum(rabbitmq_queue_messages_ready{queue="demo-queue"})
+      threshold: "5"
+      activationThreshold: "1"
