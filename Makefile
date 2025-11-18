@@ -1,4 +1,6 @@
-.PHONY: help deploy teardown status rabbitmq-ui prometheus-ui logs-rabbitmq logs-prometheus logs-keda clean
+.PHONY: help deploy teardown status rabbitmq-ui prometheus-ui logs-rabbitmq logs-prometheus logs-keda clean \
+        build-apps deploy-apps start-producing stop-producing start-consuming stop-consuming demo-status \
+        logs-producer logs-consumer
 
 # Default target
 help:
@@ -6,19 +8,30 @@ help:
 	@echo "KEDA RabbitMQ Demo - Available Commands"
 	@echo "=========================================="
 	@echo ""
-	@echo "Infrastructure Management:"
+	@echo "Layer 1 - Infrastructure:"
 	@echo "  make deploy         - Deploy all infrastructure (RabbitMQ, Prometheus, KEDA)"
 	@echo "  make teardown       - Remove all infrastructure"
 	@echo "  make status         - Show status of all components"
+	@echo ""
+	@echo "Layer 2 - Applications:"
+	@echo "  make build-apps     - Build producer and consumer Docker images"
+	@echo "  make deploy-apps    - Deploy producer and consumer applications"
+	@echo "  make start-producing - Start message production"
+	@echo "  make stop-producing  - Stop message production"
+	@echo "  make start-consuming - Start message consumption"
+	@echo "  make stop-consuming  - Stop message consumption"
+	@echo "  make demo-status     - Show demo status (queue depth, pods, etc.)"
 	@echo ""
 	@echo "Access Services:"
 	@echo "  make rabbitmq-ui    - Port-forward to RabbitMQ Management UI"
 	@echo "  make prometheus-ui  - Port-forward to Prometheus UI"
 	@echo ""
 	@echo "Logs:"
-	@echo "  make logs-rabbitmq  - Tail RabbitMQ logs"
+	@echo "  make logs-rabbitmq   - Tail RabbitMQ logs"
 	@echo "  make logs-prometheus - Tail Prometheus logs"
-	@echo "  make logs-keda      - Tail KEDA operator logs"
+	@echo "  make logs-keda       - Tail KEDA operator logs"
+	@echo "  make logs-producer   - Tail producer logs"
+	@echo "  make logs-consumer   - Tail consumer logs"
 	@echo ""
 	@echo "Other:"
 	@echo "  make clean          - Clean up local build artifacts"
@@ -90,6 +103,44 @@ logs-prometheus:
 logs-keda:
 	@echo "Tailing KEDA operator logs (Ctrl+C to exit)..."
 	@kubectl logs -f -n keda -l app=keda-operator --tail=50
+
+# Build Docker images for applications
+build-apps:
+	@./scripts/build-images.sh
+
+# Deploy applications to Kubernetes
+deploy-apps:
+	@./scripts/deploy-apps.sh
+
+# Start message production
+start-producing:
+	@./scripts/start-producing.sh
+
+# Stop message production
+stop-producing:
+	@./scripts/stop-producing.sh
+
+# Start message consumption
+start-consuming:
+	@./scripts/start-consuming.sh
+
+# Stop message consumption
+stop-consuming:
+	@./scripts/stop-consuming.sh
+
+# Show demo status
+demo-status:
+	@./scripts/demo-status.sh
+
+# Tail producer logs
+logs-producer:
+	@echo "Tailing producer logs (Ctrl+C to exit)..."
+	@kubectl logs -f -n keda-demo -l app=producer --tail=50
+
+# Tail consumer logs
+logs-consumer:
+	@echo "Tailing consumer logs (Ctrl+C to exit)..."
+	@kubectl logs -f -n keda-demo -l app=consumer --tail=50
 
 # Clean up local artifacts
 clean:

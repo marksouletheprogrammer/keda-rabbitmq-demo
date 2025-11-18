@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: producer
+  namespace: keda-demo
+  labels:
+    app: producer
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app: producer
+  template:
+    metadata:
+      labels:
+        app: producer
+    spec:
+      containers:
+      - name: producer
+        image: keda-demo-producer:latest
+        imagePullPolicy: Never
+        env:
+        - name: RABBITMQ_URL
+          valueFrom:
+            secretKeyRef:
+              name: rabbitmq-secret
+              key: connectionString
+        - name: QUEUE_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: QUEUE_NAME
+        - name: MESSAGE_RATE
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: MESSAGE_RATE
+        - name: MESSAGE_SIZE
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: MESSAGE_SIZE
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "128Mi"
+            cpu: "200m"
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true

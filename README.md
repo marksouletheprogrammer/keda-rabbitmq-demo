@@ -42,21 +42,46 @@ This demo showcases how to implement event-driven autoscaling in Kubernetes usin
 
 ```
 keda-rabbitmq-demo/
+├── cmd/                          # Application entry points
+│   ├── producer/                 # Producer application
+│   │   └── main.go
+│   └── consumer/                 # Consumer application
+│       └── main.go
+├── internal/                     # Internal packages
+│   ├── rabbitmq/                 # RabbitMQ client
+│   │   └── client.go
+│   └── message/                  # Message structures
+│       └── message.go
 ├── k8s/                          # Kubernetes manifests
 │   ├── namespace.yaml            # Demo namespace
 │   ├── rabbitmq/                 # RabbitMQ deployment
 │   │   ├── rabbitmq-deployment.yaml
 │   │   ├── rabbitmq-service.yaml
 │   │   └── rabbitmq-secret.yaml
-│   └── monitoring/               # Prometheus for metrics
-│       ├── prometheus-deployment.yaml
-│       ├── prometheus-service.yaml
-│       ├── prometheus-configmap.yaml
-│       └── prometheus-rbac.yaml
+│   ├── monitoring/               # Prometheus for metrics
+│   │   ├── prometheus-deployment.yaml
+│   │   ├── prometheus-service.yaml
+│   │   ├── prometheus-configmap.yaml
+│   │   └── prometheus-rbac.yaml
+│   └── apps/                     # Application deployments
+│       ├── app-configmap.yaml
+│       ├── producer-deployment.yaml
+│       └── consumer-deployment.yaml
 ├── scripts/                      # Management scripts
-│   ├── deploy.sh                 # Deploy all infrastructure
-│   ├── teardown.sh              # Remove all infrastructure
-│   └── install-keda.sh          # Install KEDA using Helm
+│   ├── deploy.sh                 # Deploy infrastructure
+│   ├── teardown.sh               # Remove infrastructure
+│   ├── install-keda.sh           # Install KEDA
+│   ├── build-images.sh           # Build Docker images
+│   ├── deploy-apps.sh            # Deploy applications
+│   ├── start-producing.sh        # Start producer
+│   ├── stop-producing.sh         # Stop producer
+│   ├── start-consuming.sh        # Start consumer
+│   ├── stop-consuming.sh         # Stop consumer
+│   └── demo-status.sh            # Show demo status
+├── Dockerfile.producer           # Producer container image
+├── Dockerfile.consumer           # Consumer container image
+├── go.mod                        # Go module definition
+├── go.sum                        # Go module checksums
 ├── Makefile                      # Convenient command interface
 └── README.md                     # This file
 ```
@@ -190,16 +215,84 @@ make logs-rabbitmq # Tail RabbitMQ logs
 make logs-keda     # Tail KEDA operator logs
 ```
 
-## Layer 2: Golang Applications 🚧
+## Layer 2: Golang Applications ✅
 
-**Status:** Pending
+**Status:** Complete
 
-Layer 2 will include:
-- Golang producer application (send messages to RabbitMQ)
-- Golang consumer application (process messages from RabbitMQ)
-- Kubernetes deployments for both applications
-- Prometheus metrics exposition
-- Demo control scripts (start/stop producing and consuming)
+Layer 2 provides the producer and consumer applications:
+
+### Components
+
+- **Producer Application** - Golang app that sends messages to RabbitMQ
+  - Configurable message rate (default: 10 msg/sec)
+  - Configurable message size (default: 1024 bytes)
+  - JSON message format with ID, timestamp, and payload
+  - Graceful shutdown on SIGTERM
+  
+- **Consumer Application** - Golang app that processes messages from RabbitMQ
+  - Configurable processing delay (default: 100ms to simulate work)
+  - Configurable prefetch count (default: 1)
+  - Calculates and logs message latency
+  - Graceful shutdown with message completion
+
+- **Docker Images** - Multi-stage builds for minimal size
+  - `keda-demo-producer:latest`
+  - `keda-demo-consumer:latest`
+  - Alpine-based runtime
+  - Non-root user for security
+
+### Configuration
+
+Applications are configured via environment variables from ConfigMap:
+
+- `QUEUE_NAME` - Queue name (default: `demo-queue`)
+- `MESSAGE_RATE` - Messages per second for producer
+- `MESSAGE_SIZE` - Payload size in bytes
+- `PROCESSING_DELAY_MS` - Simulated processing time for consumer
+- `PREFETCH_COUNT` - Number of unacked messages for consumer
+
+### Available Commands
+
+```bash
+# Build and deploy applications
+make build-apps      # Build Docker images
+make deploy-apps     # Deploy to Kubernetes
+
+# Control demo
+make start-producing # Start message production
+make stop-producing  # Stop message production
+make start-consuming # Start message consumption
+make stop-consuming  # Stop message consumption
+make demo-status     # Show queue depth and pod status
+
+# View logs
+make logs-producer   # Tail producer logs
+make logs-consumer   # Tail consumer logs
+```
+
+### Quick Start (Layer 2)
+
+After completing Layer 1:
+
+```bash
+# 1. Build and deploy applications
+make deploy-apps
+
+# 2. Start producing messages
+make start-producing
+
+# 3. Check queue building up
+make demo-status
+# or
+make rabbitmq-ui
+
+# 4. Start consuming messages
+make start-consuming
+
+# 5. Watch the demo in action
+make logs-producer   # In one terminal
+make logs-consumer   # In another terminal
+```
 
 ## Layer 3: Autoscaling Configurations 🚧
 
@@ -221,14 +314,23 @@ make deploy
 
 ### Scenario 2: Start Demo (Layer 2)
 ```bash
+# Deploy applications
+make deploy-apps
+
 # Start producing messages (consumer not started yet)
-# Commands will be available in Layer 2
+make start-producing
+
+# Watch queue depth grow
+make demo-status
 ```
 
 ### Scenario 3: Enable Consumption (Layer 2)
 ```bash
 # Start consuming messages from RabbitMQ
-# Commands will be available in Layer 2
+make start-consuming
+
+# Monitor consumption
+make logs-consumer
 ```
 
 ### Scenario 4: KEDA Autoscaling (Layer 3)
@@ -245,11 +347,55 @@ make deploy
 
 ### Scenario 6: Teardown
 ```bash
-# Stop demo and clean up
+# Stop producing and consuming
+make stop-producing
+make stop-consuming
+
+# Clean up all infrastructure
 make teardown
 ```
 
 ## Troubleshooting
+
+### Layer 2 Issues
+
+#### Docker Images Not Building
+
+Check Docker is running:
+```bash
+docker ps
+```
+
+Ensure Go dependencies are downloaded:
+```bash
+go mod download
+```
+
+#### Pods Not Starting
+
+Check image pull policy and availability:
+```bash
+kubectl describe pod -n keda-demo -l app=producer
+kubectl describe pod -n keda-demo -l app=consumer
+```
+
+For kind clusters, ensure images are loaded:
+```bash
+kind load docker-image keda-demo-producer:latest
+kind load docker-image keda-demo-consumer:latest
+```
+
+#### Producer/Consumer Connection Errors
+
+Verify RabbitMQ is running:
+```bash
+kubectl get pods -n keda-demo -l app=rabbitmq
+```
+
+Check connection string in secret:
+```bash
+kubectl get secret rabbitmq-secret -n keda-demo -o jsonpath='{.data.connectionString}' | base64 -d
+```
 
 ### RabbitMQ Not Starting
 

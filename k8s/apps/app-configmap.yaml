@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: keda-demo
+data:
+  QUEUE_NAME: "demo-queue"
+  MESSAGE_RATE: "10"
+  MESSAGE_SIZE: "1024"
+  PROCESSING_DELAY_MS: "100"
+  PREFETCH_COUNT: "1"
