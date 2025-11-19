@@ -2,6 +2,9 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
 echo "=========================================="
 echo "Installing Prometheus Adapter"
 echo "=========================================="
@@ -30,17 +33,7 @@ helm repo update
 echo "Installing Prometheus Adapter..."
 helm upgrade --install prometheus-adapter prometheus-community/prometheus-adapter \
   --namespace keda-demo \
-  --set prometheus.url=http://prometheus.keda-demo.svc.cluster.local \
-  --set prometheus.port=9090 \
-  --set rules.default=false \
-  --set rules.custom[0].seriesQuery='rabbitmq_queue_messages_ready{namespace="keda-demo",queue="demo-queue"}' \
-  --set rules.custom[0].resources.overrides.namespace.resource="namespace" \
-  --set rules.custom[0].name.as="rabbitmq_queue_messages_ready" \
-  --set rules.custom[0].metricsQuery='sum(rabbitmq_queue_messages_ready{namespace="keda-demo",queue="demo-queue"})' \
-  --set resources.requests.cpu=100m \
-  --set resources.requests.memory=128Mi \
-  --set resources.limits.cpu=500m \
-  --set resources.limits.memory=256Mi \
+  --values "${PROJECT_ROOT}/k8s/autoscaling/prometheus-adapter/values.yaml" \
   --wait
 
 echo ""

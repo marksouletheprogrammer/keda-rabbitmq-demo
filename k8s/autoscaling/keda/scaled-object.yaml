@@ -15,6 +15,6 @@ spec:
     metadata:
       serverAddress: http://prometheus.keda-demo.svc.cluster.local:9090
       metricName: rabbitmq_queue_messages_ready
-      query: sum(rabbitmq_queue_messages_ready{queue="demo-queue"})
+      query: sum(rabbitmq_queue_messages_ready{kubernetes_namespace="keda-demo"})
       threshold: "5"
       activationThreshold: "1"

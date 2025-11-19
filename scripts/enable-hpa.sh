@@ -6,15 +6,27 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 echo "=========================================="
-echo "Enabling HPA + Prometheus Adapter Scaling"
+echo " Enabling HPA + Prometheus Adapter Autoscaling"
 echo "=========================================="
 echo ""
 
 # Check if KEDA scaling is active
 if kubectl get scaledobject consumer-scaledobject -n keda-demo &> /dev/null; then
-    echo "❌ Error: KEDA autoscaling is currently active."
-    echo "Please disable KEDA first: make disable-keda"
+    echo " Error: KEDA autoscaling is currently active!"
+    echo ""
+    echo "Please disable KEDA first:"
+    echo "  make disable-keda"
+    echo ""
     exit 1
+fi
+
+# Check if KEDA is installed (conflicts with Prometheus Adapter)
+if helm list -n keda | grep -q keda; then
+    echo "  KEDA is installed and conflicts with Prometheus Adapter"
+    echo "   Temporarily uninstalling KEDA..."
+    helm uninstall keda -n keda
+    echo "   Waiting for KEDA to be removed..."
+    sleep 10
 fi
 
 # Check if Prometheus Adapter is installed

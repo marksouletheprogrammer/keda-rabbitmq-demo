@@ -17,11 +17,24 @@ if kubectl get hpa consumer-hpa -n keda-demo &> /dev/null; then
     exit 1
 fi
 
-# Check if KEDA is installed
+# Check if Prometheus Adapter is installed (conflicts with KEDA)
+if helm list -n keda-demo | grep -q prometheus-adapter; then
+    echo "⚠️  Prometheus Adapter is installed and conflicts with KEDA"
+    echo "   Uninstalling Prometheus Adapter..."
+    helm uninstall prometheus-adapter -n keda-demo
+    echo "   Waiting for Prometheus Adapter to be removed..."
+    sleep 10
+fi
+
+# Check if KEDA is installed, reinstall if needed
 if ! kubectl get deployment keda-operator -n keda &> /dev/null; then
-    echo "❌ Error: KEDA is not installed."
-    echo "Please run 'make deploy' first to install KEDA."
-    exit 1
+    echo "KEDA not found. Installing..."
+    echo ""
+    helm repo add kedacore https://kedacore.github.io/charts
+    helm repo update
+    helm install keda kedacore/keda --namespace keda --create-namespace --wait
+    echo "✅ KEDA installed"
+    echo ""
 fi
 
 # Apply ScaledObject

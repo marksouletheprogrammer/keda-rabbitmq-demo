@@ -11,17 +11,13 @@ spec:
   minReplicas: 1
   maxReplicas: 10
   metrics:
-  - type: Object
-    object:
+  - type: External
+    external:
       metric:
         name: rabbitmq_queue_messages_ready
-      describedObject:
-        apiVersion: v1
-        kind: Service
-        name: rabbitmq
       target:
-        type: Value
-        value: "5"
+        type: AverageValue
+        averageValue: "5"
   behavior:
     scaleDown:
       stabilizationWindowSeconds: 60

@@ -1,0 +1,21 @@
+prometheus:
+  url: http://prometheus.keda-demo.svc.cluster.local
+  port: 9090
+
+rules:
+  default: false
+  external:
+  - seriesQuery: 'rabbitmq_queue_messages_ready'
+    resources:
+      template: <<.Resource>>
+    name:
+      as: "rabbitmq_queue_messages_ready"
+    metricsQuery: 'sum(<<.Series>>{kubernetes_namespace="keda-demo"})'
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
