@@ -126,7 +126,7 @@ kubectl version --client
 helm version
 ```
 
-## Quick Start (Layer 1)
+## Quick Start
 
 ### 1. Deploy Infrastructure
 
@@ -192,11 +192,9 @@ Remove all infrastructure:
 make teardown
 ```
 
-## Layer 1: Base Infrastructure ✅
+## Infrastructure Components
 
-**Status:** Complete
-
-Layer 1 provides the foundational infrastructure for the demo:
+The demo includes the following infrastructure:
 
 ### Components
 
@@ -227,11 +225,9 @@ make logs-rabbitmq # Tail RabbitMQ logs
 make logs-keda     # Tail KEDA operator logs
 ```
 
-## Layer 2: Golang Applications ✅
+## Applications
 
-**Status:** Complete
-
-Layer 2 provides the producer and consumer applications:
+The demo includes producer and consumer applications:
 
 ### Components
 
@@ -282,9 +278,9 @@ make logs-producer   # Tail producer logs
 make logs-consumer   # Tail consumer logs
 ```
 
-### Quick Start (Layer 2)
+### Running the Applications
 
-After completing Layer 1:
+Once infrastructure is deployed:
 
 ```bash
 # 1. Build and deploy applications
@@ -306,11 +302,9 @@ make logs-producer   # In one terminal
 make logs-consumer   # In another terminal
 ```
 
-## Layer 3: Autoscaling Configurations ✅
+## Autoscaling
 
-**Status:** Complete
-
-Layer 3 provides two mutually exclusive autoscaling approaches for comparing traditional Kubernetes HPA with KEDA:
+This demo provides two mutually exclusive autoscaling approaches for comparing traditional Kubernetes HPA with KEDA:
 
 ### Autoscaling Options
 
@@ -389,24 +383,9 @@ make scaling-status
 make watch-scaling
 ```
 
-### Comparison Table
+### Testing Autoscaling
 
-| Feature | HPA + Prometheus Adapter | KEDA |
-|---------|-------------------------|------|
-| **Setup Complexity** | High (Adapter + HPA) | Low (ScaledObject only) |
-| **Min Replicas** | 1 | 0 (scale to zero!) |
-| **Metric Source** | Prometheus (via Adapter) | Prometheus (via KEDA) |
-| **Latency** | Similar (both query Prometheus) | Similar (both query Prometheus) |
-| **Flexibility** | Any Prometheus metric | Event source specific |
-| **Standard K8s** | Yes | Requires KEDA |
-| **Configuration** | Multiple resources | Single ScaledObject |
-| **Scale to Zero** | No | Yes |
-
-### Quick Start (Layer 3)
-
-After completing Layers 1 and 2:
-
-#### Testing HPA + Prometheus Adapter
+#### Option 1: HPA + Prometheus Adapter
 
 ```bash
 # 1. Enable HPA-based autoscaling
@@ -430,7 +409,7 @@ make stop-producing
 make disable-hpa
 ```
 
-#### Testing KEDA Autoscaling
+#### Option 2: KEDA Autoscaling
 
 ```bash
 # 1. Enable KEDA autoscaling (starts at 0 replicas)
@@ -471,13 +450,13 @@ make enable-keda
 
 ## Demo Scenarios
 
-### Scenario 1: Setup
+### Scenario 1: Basic Setup
 ```bash
-# User pulls down the repo and deploys infrastructure
+# Deploy infrastructure
 make deploy
 ```
 
-### Scenario 2: Start Demo (Layer 2)
+### Scenario 2: Running Applications
 ```bash
 # Deploy applications
 make deploy-apps
@@ -489,7 +468,7 @@ make start-producing
 make demo-status
 ```
 
-### Scenario 3: Enable Consumption (Layer 2)
+### Scenario 3: Message Consumption
 ```bash
 # Start consuming messages from RabbitMQ
 make start-consuming
@@ -498,13 +477,12 @@ make start-consuming
 make logs-consumer
 ```
 
-### Scenario 4: HPA Autoscaling (Layer 3)
+### Scenario 4: HPA Autoscaling
 ```bash
 # Enable HPA + Prometheus Adapter autoscaling
 make enable-hpa
 
-# Producer should already be running from Scenario 2
-# If not, start it:
+# Start producing messages
 make start-producing
 
 # Watch HPA scale consumer pods based on queue depth
@@ -519,7 +497,7 @@ make rabbitmq-ui
 make stop-producing
 ```
 
-### Scenario 5: KEDA Autoscaling (Layer 3)
+### Scenario 5: KEDA Autoscaling
 ```bash
 # Switch to KEDA autoscaling
 make disable-hpa
@@ -539,7 +517,7 @@ make rabbitmq-ui
 make stop-producing
 ```
 
-### Scenario 6: Comparison & Teardown
+### Scenario 6: Comparing Both Methods
 ```bash
 # Compare both autoscaling methods
 # 1. Test HPA
@@ -565,7 +543,7 @@ make teardown
 
 ## Troubleshooting
 
-### Layer 3 Issues
+### Autoscaling Issues
 
 #### Prometheus Adapter Not Installing
 
@@ -666,7 +644,7 @@ Check consumer deployment is not manually scaled:
 kubectl get deployment consumer -n keda-demo
 ```
 
-### Layer 2 Issues
+### Application Issues
 
 #### Docker Images Not Building
 
@@ -706,7 +684,9 @@ Check connection string in secret:
 kubectl get secret rabbitmq-secret -n keda-demo -o jsonpath='{.data.connectionString}' | base64 -d
 ```
 
-### RabbitMQ Not Starting
+### Infrastructure Issues
+
+#### RabbitMQ Not Starting
 
 Check RabbitMQ logs:
 ```bash
@@ -757,11 +737,3 @@ For Docker Desktop, ensure Kubernetes is enabled in settings.
 - [RabbitMQ Documentation](https://www.rabbitmq.com/documentation.html)
 - [Prometheus Documentation](https://prometheus.io/docs/)
 - [Kubernetes HPA Documentation](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/)
-
-## License
-
-MIT
-
-## Contributing
-
-This is a demo project. Feel free to extend and modify for your learning purposes

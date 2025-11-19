@@ -42,11 +42,11 @@ spec:
               key: MESSAGE_SIZE
         resources:
           requests:
-            memory: "64Mi"
-            cpu: "100m"
-          limits:
             memory: "128Mi"
-            cpu: "200m"
+            cpu: "500m"
+          limits:
+            memory: "256Mi"
+            cpu: "1000m"
         securityContext:
           runAsNonRoot: true
           runAsUser: 1000

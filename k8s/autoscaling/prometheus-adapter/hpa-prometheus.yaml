@@ -20,18 +20,18 @@ spec:
         averageValue: "5"
   behavior:
     scaleDown:
-      stabilizationWindowSeconds: 60
+      stabilizationWindowSeconds: 10 # For demo purposes, way too low for practical application.
       policies:
       - type: Percent
         value: 50
-        periodSeconds: 15
+        periodSeconds: 5
     scaleUp:
       stabilizationWindowSeconds: 0
       policies:
       - type: Percent
         value: 100
-        periodSeconds: 15
+        periodSeconds: 5
       - type: Pods
         value: 2
-        periodSeconds: 15
+        periodSeconds: 5
       selectPolicy: Max

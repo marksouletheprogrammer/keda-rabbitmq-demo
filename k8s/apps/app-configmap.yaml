@@ -5,7 +5,7 @@ metadata:
   namespace: keda-demo
 data:
   QUEUE_NAME: "demo-queue"
-  MESSAGE_RATE: "10"
+  MESSAGE_RATE: "20"
   MESSAGE_SIZE: "1024"
   PROCESSING_DELAY_MS: "100"
   PREFETCH_COUNT: "1"
